@@ -1,0 +1,5 @@
+.venv/
+.env
+knowledge_base/
+build/
+etl_mas.egg-info/

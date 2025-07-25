@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "etl_mas"
+version = "0.1.0"
+authors = [
+  { name = "Meric Kaynak", email = "mmk23.business@email.com" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+
+# Laufzeit-Abhängigkeiten
+dependencies = [
+  "requests>=2.31.0",
+  "langchain>=0.0.300",
+  "pandas>=2.1.0",
+  "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "black>=24.0.0",
+  "mypy>=1.10.0",
+  "langchain-chroma>=0.1.2",
+  "tiktoken",
+  "langchain-ollama",
+  "langchain-community"
+]
+
+[project.urls]
+Repository = "https://github.com/merickaynak/etl_mas"
