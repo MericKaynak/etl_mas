@@ -9,7 +9,7 @@ authors = [
   { name = "Meric Kaynak", email = "mmk23.business@email.com" }
 ]
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.8"
 
 # Laufzeit-Abhängigkeiten
@@ -28,7 +28,8 @@ dev = [
   "langchain-chroma>=0.1.2",
   "tiktoken",
   "langchain-ollama",
-  "langchain-community"
+  "langchain-community",
+  "gradio>=3.35.0"
 ]
 
 [project.urls]
