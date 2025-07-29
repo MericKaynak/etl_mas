@@ -3,3 +3,4 @@
 knowledge_base/
 build/
 etl_mas.egg-info/
+notebooks/chroma_langchain_db
