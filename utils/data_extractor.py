@@ -62,24 +62,11 @@ class DataExtractor:
         self.supported_exts = [".csv", ".json", ".xlsx", ".xml"]
 
         # Load prompts from files
-        system_prompt_path = prompt_dir / "system_prompt.txt"
-        message_prompt_path = prompt_dir / "message_prompt.txt"
-
-        with open(system_prompt_path, "r") as f:
-            system_prompt = f.read()
-        with open(message_prompt_path, "r") as f:
-            self.message_prompt = f.read()
-
-        self.data_extracter_prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{input}"),
-        ])
-        
-        python_tool = self.QuietPythonREPLTool(description="Führt Python-Code aus.")
-        self.agent = create_react_agent(llm=llm, tools=[python_tool], prompt=system_prompt)
+        self.system_prompt_path = prompt_dir / "system_prompt.txt"
+        self.message_prompt_path = prompt_dir / "message_prompt.txt"
 
 
-    async def extract_to_csv(self,selected_files, uploaded_files):
+    async def extract_to_csv(self,selected_files, uploaded_files, linkml_schema: str):
             """
             Analysiert die Struktur (Schema) der ausgewählten und hochgeladenen Dateien und übergibt diese
             an ein LLM zur Beantwortung einer Frage.
@@ -96,11 +83,26 @@ class DataExtractor:
             Yields:
                 str: Laufend erzeugter Text aus der LLM-Antwort, zeilenweise gestreamt.
             """
-            
+        
             selected_paths = [self.kb_dir / name for name in selected_files]
             uploaded_paths = [Path(f.name) for f in uploaded_files or []]
             all_paths = selected_paths + uploaded_paths
             combined_content = []
+
+            with open(self.system_prompt_path, "r") as f:
+                self.system_prompt = f.read()
+            with open(self.message_prompt_path, "r") as f:
+                self.message_prompt = f.read()
+
+            self.data_extracter_prompt = ChatPromptTemplate.from_messages([
+                ("system", self.system_prompt),
+                ("human", "{input}"),
+            ])
+
+            system_prompt = PromptTemplate.from_templat(system_prompt).format(linkml_schema)
+            
+            python_tool = self.QuietPythonREPLTool(description="Führt Python-Code aus.")
+            self.agent = create_react_agent(llm=llm, tools=[python_tool], prompt=system_prompt)
 
             for path in all_paths:
                 try:
@@ -142,35 +144,4 @@ class DataExtractor:
                     yield buffer
 
 
-
-
-# Verwende das neue Tool
-
-tools = [python_tool]
-
-# Rest bleibt gleich
-llm = ChatOpenAI(temperature=0, model="gpt-4o")
-agent = create_react_agent(llm=llm, tools=tools, prompt=system_prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True,handle_parsing_errors=True)
-
-
-
-
-file_path = "../knowledge_base/ChinookData.json"
-# --- 5. Interaktion mit dem Agenten ---
-user_input = f"Ich will das du mir einen Code generiert welcher eine Daten File extrahiert passende pandas DataFrame. Wichtig nur ausfuehren schaue dir die Daten nicht vorher an. Hierzu geben ich dir eine LinkML file welche dazu dient die Struktur der Daten zu verstehen und die Daten in diesen Format zu uebernehemn in ein relationales Datenbankschema welches spawter in eine sql Datenbank ingested wird. Die Daten koenen Im unterschiedlichen Formaten vorliegen, wie z.B. XML, JSON, CSV oder Excel. Gib mir nur den Code also auch nicht in einem Codeblock. Die LinkML Datei ist: {linkml_schema}. The schema of the data is: {schema_str}. The file is a JSON. \n Tail of the file: {tail_str} \n Head: {head_str} \n Middle: {middle_str}"
-
-response = agent_executor.invoke({
-    "input": (
-        f"Erstelle ein Python-Skript, das die Dateien '{file_path}' extrahiert. "
-        "Verwende das gegebene LinkML-Schema ({linkml_schema}), das die Struktur der Daten vorgibt. "
-        "Die Datei ist im JSON-Format. Beispiele aus der Datei: "
-        f"Head: {head_str}, Middle: {middle_str}, Tail: {tail_str}. "
-        "Das Ziel ist ein korrekter DataFrame nach dem Schema: {schema_str}. "
-        "Der Agent soll prüfen, ob der DataFrame gültig ist. Wenn nicht, soll er den Code anpassen und erneut versuchen."
-        "Gib mir am Ende eine Zusammenfassung welcge Tballen du extrahiert hast und konntest es sollen alle die in der linkmlfile Beschreiben sind vorkommen."
-    )
-})
-
-print(response)
 

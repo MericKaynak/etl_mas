@@ -1,0 +1,2 @@
+Lade mir alle CSV-Dateien aus dem Verzeichnis 'temp' in die Datenbank.
+Beachte die Relationen im LinkML-Schema. Prüfe Tabellen, wahre referenzielle Integrität, vermeide Duplikate, und aktualisiere 'domain_knowledge'.
