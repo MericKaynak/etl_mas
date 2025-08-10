@@ -102,7 +102,7 @@ class DataExtractor:
             system_prompt = PromptTemplate.from_templat(system_prompt).format(linkml_schema)
             
             python_tool = self.QuietPythonREPLTool(description="Führt Python-Code aus.")
-            self.agent = create_react_agent(llm=llm, tools=[python_tool], prompt=system_prompt)
+            self.agent = create_react_agent(llm=self.llm, tools=[python_tool], prompt=system_prompt)
 
             for path in all_paths:
                 try:

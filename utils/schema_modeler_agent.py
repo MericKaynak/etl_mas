@@ -1,7 +1,5 @@
 import json
 from pathlib import Path
-import os
-import getpass
 from langchain.prompts.chat import ChatPromptTemplate
 from utils.schema_analyzer import SchemaAnalyzer
 
@@ -26,7 +24,7 @@ class SchemaModeler:
     def __init__(
         self,
         llm,
-        kb_dir: Path = Path("knowledge_base"),
+        kb_dir: Path = Path("knowledge_base/persistant"),
         prompt_dir: Path = Path("prompts/schema_modeler")
     ):
         """
@@ -110,7 +108,7 @@ class SchemaModeler:
 
             except Exception as e:
                 combined_content.append(f"=== File: {path.name} ===\n Error while parsing: {str(e)}\n")
-
+        
         full_data_context = "\n\n".join(combined_content)
         user_input = f"User question: {self.message_prompt}\n\nThe Schema of the Data is:\n{full_data_context}"
         prompt_messages = self.schema_modeler_prompt.invoke({"input": user_input})
