@@ -14,7 +14,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init_db:/docker-entrypoint-initdb.d
-      # Source of the init SQL-Files https://github.com/MericKaynak/SWE-Praktikum
+      - ./knowledge_base/temp:/knowledge_base/temp
 
   pgadmin:
     image: dpage/pgadmin4
@@ -29,6 +29,20 @@ services:
       - postgres
     volumes:
       - pgadmin_data:/var/lib/pgadmin
+
+  python_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: langchain_python_app
+    restart: "no"   # je nach Usecase kannst du hier always, on-failure oder no nehmen
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+    command: ["python", "main.py"]
 
 volumes:
   pgdata:

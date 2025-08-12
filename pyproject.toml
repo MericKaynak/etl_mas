@@ -9,15 +9,12 @@ authors = [
   { name = "Meric Kaynak", email = "mmk23.business@email.com" }
 ]
 readme = "README.md"
-license = { text = "Apache-2.0" }
-requires-python = ">=3.8"
+license = "Apache-2.0"  # SPDX-konform
+requires-python = ">=3.9"
 
-# Laufzeit-Abhängigkeiten
 dependencies = [
   "requests>=2.31.0",
   "langchain>=0.0.300",
-  "pandas>=2.1.0",
-  "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]
@@ -29,8 +26,19 @@ dev = [
   "tiktoken",
   "langchain-community",
   "gradio>=3.35.0",
-  "psycopg2"
+  "psycopg2",
+  "langchain_tavily",
+  "langgraph-checkpoint-sqlite",
+  "aiosqlite","langchain[openai]","langchain-experimental","langgraph","streamlit"
 ]
 
 [project.urls]
 Repository = "https://github.com/merickaynak/etl_mas"
+
+[tool.setuptools]
+packages = [
+  "prompts",
+  "knowledge_base",
+  "utils",
+  "temp_uploads"
+]

@@ -10,8 +10,16 @@ from langchain.prompts import PromptTemplate
 from utils.schema_analyzer import SchemaAnalyzer
 from pathlib import Path
 from langchain.prompts.chat import ChatPromptTemplate
+from agent_state import AgentState 
 
 
+class QuietPythonREPLTool(PythonREPLTool):
+    def _run(self, query: str) -> str:
+        result = super()._run(query)
+        # Schneide lange Ausgaben ab
+        if len(result) > 1000:
+            return result[:1000] + "\n... (output was cut, it is too long)"
+        return result
 
 class DataExtractor:
     """
@@ -145,3 +153,73 @@ class DataExtractor:
 
 
 
+async def run_data_extractor_node(state: AgentState, llm, kb_dir: Path, prompt_dir: Path):
+    """
+    Ein LangGraph-Knoten, der einen ReAct-Agenten mit einem Python-Tool ausführt,
+    um Daten basierend auf einem Schema zu extrahieren oder zu bearbeiten.
+    """
+    print("--- IM DATA EXTRACTOR KNOTEN ---")
+
+    # 1. Benötigte Daten aus dem zentralen Zustand extrahieren
+    user_message = state['messages'][-1].content
+    selected_files = state.get('selected_files', [])
+    uploaded_files = state.get('uploaded_files', [])
+    linkml_schema = state.get('linkml_schema', "") # Hole das LinkML-Schema
+
+    # 2. Schema-Analyse durchführen, um Kontext für den Agenten zu schaffen
+    selected_paths = [kb_dir / name for name in selected_files]
+    uploaded_paths = [Path(f.name) for f in uploaded_files or []]
+    all_paths = selected_paths + uploaded_paths
+    combined_content = []
+
+    for path in all_paths:
+        try:
+            analyzer = SchemaAnalyzer(str(path))
+            schema_result = analyzer.analyze()
+            snippets = analyzer.get_file_snippets(n=10)
+            file_block = f"""\n=== File: {path.name} (Full Path: {path.resolve()}) ===\n
+            📊 Schema: {json.dumps(schema_result, indent=2)}
+            📄 Snippets:
+            {snippets.get("head", "")}
+            ...
+            {snippets.get("tail", "")}"""
+            combined_content.append(file_block)
+        except Exception as e:
+            combined_content.append(f"=== File: {path.name} ===\n Error while parsing: {str(e)}\n")
+    
+    full_data_context = "\n\n".join(combined_content)
+
+    # 3. Den ReAct-Agenten und den Executor erstellen
+    # Lade den System-Prompt für den Agenten
+    with open(prompt_dir / "system_prompt.txt", "r") as f:
+        system_prompt_template = f.read()
+
+    # Formatiere den Prompt mit den spezifischen Schemata
+    react_prompt_template = PromptTemplate.from_template(system_prompt_template)
+    react_prompt = react_prompt_template.format(linkml_schema=linkml_schema)
+    
+    # Erstelle das Python-Tool
+    python_tool = QuietPythonREPLTool(description="Führt Python-Code aus, um Daten zu analysieren und zu manipulieren. Nutze Pandas (import pandas as pd), um Dateien zu lesen (z.B. pd.read_csv('path/to/file.csv')).")
+    
+    # Erstelle den Agenten
+    agent = create_react_agent(llm=llm, tools=[python_tool], prompt=react_prompt)
+    agent_executor = AgentExecutor(
+        agent=agent, 
+        tools=[python_tool], 
+        verbose=True, # Sehr nützlich für das Debugging!
+        handle_parsing_errors=True
+    )
+
+    # 4. Den Agenten ausführen
+    # Der Input muss den Kontext UND die eigentliche Aufgabe enthalten
+    agent_input = (f"User question: {user_message}\n\n"
+                   f"You have access to the following files and their schemas:\n{full_data_context}")
+
+    print(f"\n--- Starte AgentExecutor mit Input ---\n{agent_input}\n----------------------------------")
+    
+    result = await agent_executor.ainvoke({"input": agent_input})
+
+    # 5. Den Zustand mit dem Ergebnis des Agenten aktualisieren
+    return {
+        "messages": [AIMessage(content=result["output"])]
+    }
