@@ -4,3 +4,5 @@ build/
 etl_mas.egg-info/
 notebooks/chroma_langchain_db
 notebooks/temp
+uv.lock
+__pycache__/
