@@ -5,11 +5,9 @@ import uuid
 import functools
 from pathlib import Path
 
-
 import gradio as gr
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import init_chat_model
 from langchain.agents import create_react_agent, AgentExecutor
-from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langgraph.graph import StateGraph, END
@@ -21,10 +19,15 @@ from utils.custom_tools import QuietPythonREPLTool,PostgreSQLToolkit
 from utils.schema_analyzer import SchemaAnalyzer
 
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("LLM_API_KEY")
+llm_provider = os.getenv("LLM_PROVIDER")
+llm_model = os.getenv("LLM_MODEL")
+
 
 # Initialisieren Sie das LLM einmal
-llm = ChatOpenAI(model="gpt-4o", temperature=0, streaming=True)
+llm = init_chat_model(
+    llm_model, model_provider=llm_provider, temperature=0
+)
 
 # Verzeichnisse für Daten und Prompts
 KB_DIR = Path("knowledge_base/persistant")
@@ -40,9 +43,7 @@ TEMP_UPLOADS_DIR.mkdir(exist_ok=True)
 
 from langchain.prompts import PromptTemplate
 
-
-
-with open("prompts/etl_agent", "r", encoding="utf-8") as f:
+with open("prompts\etl_agent\system_prompt.txt", "r", encoding="utf-8") as f:
     ETL_AGENT_SYSTEM_PROMPT = f.read()
 
 

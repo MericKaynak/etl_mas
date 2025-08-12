@@ -14,23 +14,22 @@ requires-python = ">=3.9"
 
 dependencies = [
   "requests>=2.31.0",
-  "langchain>=0.0.300",
-]
-
-[project.optional-dependencies]
-dev = [
   "pytest>=8.0.0",
   "black>=24.0.0",
   "mypy>=1.10.0",
-  "langchain-chroma>=0.1.2",
   "tiktoken",
   "langchain-community",
-  "gradio>=3.35.0",
+  "gradio",
   "psycopg2",
   "langchain_tavily",
   "langgraph-checkpoint-sqlite",
-  "aiosqlite","langchain[openai]","langchain-experimental","langgraph","streamlit"
+  "aiosqlite","langchain[openai]",
+  "langchain-experimental",
+  "langgraph",
+  "streamlit",
+  "langchain-google-genai"
 ]
+
 
 [project.urls]
 Repository = "https://github.com/merickaynak/etl_mas"

@@ -1,8 +1,11 @@
 .venv/
-.env
 build/
 etl_mas.egg-info/
 notebooks/chroma_langchain_db
 notebooks/temp
 uv.lock
 __pycache__/
+.env
+agent_memory.db
+agent_memory.db-shm
+agent_memory.db-wal
