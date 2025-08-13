@@ -17,6 +17,8 @@ import asyncio
 from dotenv import load_dotenv
 from utils.custom_tools import QuietPythonREPLTool,PostgreSQLToolkit
 from utils.schema_analyzer import SchemaAnalyzer
+from utils.etl_agent import create_etl_agent_executor
+from utils.helper_utils import generate_file_analysis_context
 
 load_dotenv()
 api_key = os.getenv("LLM_API_KEY")
@@ -75,22 +77,7 @@ async def run_schema_modeler_node(state: AgentState):
     with open(SCHEMA_PROMPT_DIR / "system_prompt.txt", "r") as f:
         system_prompt = f.read()
     all_paths = [KB_DIR / f for f in state.get('selected_files', [])] + [Path(f) for f in state.get('uploaded_files', [])]
-    combined_content = []
-    for path in all_paths:
-        try:
-            analyzer = SchemaAnalyzer(str(path))
-            schema_result = analyzer.analyze()
-            snippets = analyzer.get_file_snippets(n=10)
-
-            file_block = f"""\n=== File: {path.name} ===\n
-            📊 Schema: {json.dumps(schema_result, indent=2)}
-            📄 Head: {snippets.get("head", "")}
-            📄 Middle: {snippets.get("middle", "")}
-            📄 Tail: {snippets.get("tail", "")}"""
-            combined_content.append(file_block)
-        except Exception as e:
-            combined_content.append(f"=== File: {path.name} ===\n Error: {str(e)}\n")
-    full_data_context = "\n\n".join(combined_content)
+    full_data_context = generate_file_analysis_context(all_paths)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         MessagesPlaceholder(variable_name="chat_history"),
@@ -106,50 +93,17 @@ async def run_etl_agent_node(state: AgentState):
     user_message = state['messages'][-1].content
     linkml_schema = state.get("linkml_schema", "No LinkML schema provided.")
 
-    # 1. Python-Tool initialisieren (wie zuvor)
-    python_tool = QuietPythonREPLTool(description="Dient dazu Daten zu laden, transformieren und zu speichern.")
+    agent_executor = create_etl_agent_executor(llm)
 
-    try:
-        sql_tools = PostgreSQLToolkit.get_tools(llm)
-        print("--- Successfully connected to PostgreSQL. ---")
-    except Exception as e:
-        print(f"--- DATABASE CONNECTION FAILED: {e} ---")
-        # Geben Sie eine Fehlermeldung zurück, wenn die DB nicht erreichbar ist
-        error_message = AIMessage(content=f"Error: Could not connect to the database. Please check the connection settings and ensure the database is running. Details: {e}")
-        return {"messages": [error_message]}
-
-    # 3. Beide Toolsets kombinieren
-    tools = [python_tool] + sql_tools
-
-    # 4. Agenten mit dem neuen Prompt erstellen
-    prompt = PromptTemplate.from_template(ETL_AGENT_SYSTEM_PROMPT)
-    
-    agent = create_react_agent(llm, tools, prompt)
-    agent_executor = AgentExecutor(
-        agent=agent, 
-        tools=tools, 
-        verbose=True, 
-        handle_parsing_errors=True,
-        max_iterations=15
-    )
-
-    # Den Agenten mit dem Kontext aufrufen
-    # Wir übergeben die Dateipfade direkt im Input, damit der Agent weiß, welche Dateien er verarbeiten soll.
-    all_paths = [str(KB_DIR / f) for f in state.get('selected_files', [])] + state.get('uploaded_files', [])
-    file_context = "\n".join(all_paths)
-    
-    agent_input = (
-        f"User question: {user_message}\n\n"
-        f"LinkML Schema to use: {linkml_schema}\n\n"
-        f"Process the following data files: {file_context}"
-    )
+    all_paths = [KB_DIR / f for f in state.get('selected_files', [])] + [Path(f) for f in state.get('uploaded_files', [])]
+    full_data_context = generate_file_analysis_context(all_paths)
 
     result = await agent_executor.ainvoke({
-        "input": agent_input,
+        "input": full_data_context,
         "chat_history": state['messages'][:-1],
         "linkml_schema": linkml_schema
     })
-
+    
     return {"messages": [AIMessage(content=result["output"])]}
 
 
