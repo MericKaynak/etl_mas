@@ -7,18 +7,15 @@ from pathlib import Path
 
 import gradio as gr
 from langchain.chat_models import init_chat_model
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from langchain_core.messages import HumanMessage
 from langgraph.graph import StateGraph, END
-from typing import List, TypedDict, Annotated, Optional
-import operator
 import asyncio
 from dotenv import load_dotenv
-from utils.custom_tools import QuietPythonREPLTool,PostgreSQLToolkit
-from utils.schema_analyzer import SchemaAnalyzer
-from utils.etl_agent import create_etl_agent_executor
-from utils.helper_utils import generate_file_analysis_context
+from utils.schema_modeler_agent import run_schema_modeler_node
+from utils.agent_state import AgentState
+from utils.etl_agent import run_etl_agent_node
+from utils.orchestrator import orchestrator_node
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 load_dotenv()
 api_key = os.getenv("LLM_API_KEY")
@@ -26,20 +23,17 @@ llm_provider = os.getenv("LLM_PROVIDER")
 llm_model = os.getenv("LLM_MODEL")
 
 
-# Initialisieren Sie das LLM einmal
 llm = init_chat_model(
     llm_model, model_provider=llm_provider, temperature=0
 )
 
-# Verzeichnisse für Daten und Prompts
 KB_DIR = Path("knowledge_base/persistant")
-SCHEMA_PROMPT_DIR = Path("prompts/schema_modeler")
+KB_DIR.mkdir(exist_ok=True)
+
 EXTRACTOR_PROMPT_DIR = Path("prompts/data_extractor")
 TEMP_UPLOADS_DIR = Path("temp_uploads")
 
-# Sicherstellen, dass die Verzeichnisse existieren
-KB_DIR.mkdir(exist_ok=True)
-SCHEMA_PROMPT_DIR.mkdir(exist_ok=True, parents=True)
+
 EXTRACTOR_PROMPT_DIR.mkdir(exist_ok=True, parents=True)
 TEMP_UPLOADS_DIR.mkdir(exist_ok=True)
 
@@ -54,92 +48,17 @@ _app_container = {"app": None}
 _app_lock = asyncio.Lock()
 
 
-
-# --- 2. Definition des zentralen Zustands (Gedächtnis) ---
-
-class AgentState(TypedDict):
-    messages: Annotated[List[BaseMessage], operator.add]
-    selected_files: List[str]
-    uploaded_files: List[str]
-    linkml_schema: Optional[str]
-    next: str
-
-
-# --- 3. Implementierung der Agenten-Knoten (unverändert) ---
-
-# Helferklasse für das Python-Tool
-
-
-# KNOTEN 1: Schema Modeler
-async def run_schema_modeler_node(state: AgentState):
-    print("--- AGENT: SchemaModeler ---")
-    user_message = state['messages'][-1].content
-    with open(SCHEMA_PROMPT_DIR / "system_prompt.txt", "r") as f:
-        system_prompt = f.read()
-    all_paths = [KB_DIR / f for f in state.get('selected_files', [])] + [Path(f) for f in state.get('uploaded_files', [])]
-    full_data_context = generate_file_analysis_context(all_paths)
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "User Question: {input}\n\nData Context:\n{data_context}")
-    ])
-    chain = prompt | llm
-    response = await chain.ainvoke({"chat_history": state['messages'][:-1], "input": user_message, "data_context": full_data_context})
-    return {"messages": [response]}
-
-# KNOTEN 2: Data Extractor
-async def run_etl_agent_node(state: AgentState):
-    print("--- AGENT: ETLAgent ---")
-    user_message = state['messages'][-1].content
-    linkml_schema = state.get("linkml_schema", "No LinkML schema provided.")
-
-    agent_executor = create_etl_agent_executor(llm)
-
-    all_paths = [KB_DIR / f for f in state.get('selected_files', [])] + [Path(f) for f in state.get('uploaded_files', [])]
-    full_data_context = generate_file_analysis_context(all_paths)
-
-    result = await agent_executor.ainvoke({
-        "input": full_data_context,
-        "chat_history": state['messages'][:-1],
-        "linkml_schema": linkml_schema
-    })
-    
-    return {"messages": [AIMessage(content=result["output"])]}
-
-
-# KNOTEN 3: Supervisor (Der Router)
-from langchain_core.pydantic_v1 import BaseModel, Field
-class RouteQuery(BaseModel):
-    next_agent: str = Field(
-        description="Must be 'SchemaModeler' or 'ETLAgent'.", 
-        enum=["SchemaModeler", "ETLAgent"]
-    )
-
-async def supervisor_node(state: AgentState):
-    print("--- SUPERVISOR ---")
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a supervisor routing user requests.
-        - 'SchemaModeler': Use this agent if the user ONLY wants to understand, analyze, or generate a schema (like LinkML) for their data. This is for analysis tasks.
-        - 'ETLAgent': Use this agent if the user wants to ACTUALLY load, process, transform, and save data into a database. This is for operational ETL tasks.
-        Based on the last user request, choose the most appropriate agent."""),
-        MessagesPlaceholder(variable_name="messages")
-    ])
-    chain = prompt | llm.with_structured_output(RouteQuery)
-    result = await chain.ainvoke({"messages": state['messages']})
-    print(f"Supervisor decision: Route to {result.next_agent}")
-    return {"next": result.next_agent}
-
-
 workflow = StateGraph(AgentState)
 
-workflow.add_node("supervisor", supervisor_node)
-workflow.add_node("SchemaModeler", run_schema_modeler_node)
-workflow.add_node("ETLAgent", run_etl_agent_node) # Neuer Knoten
+workflow.add_node("Orchestrator", functools.partial(orchestrator_node, llm))
+workflow.add_node("SchemaModeler", functools.partial(run_schema_modeler_node, llm))
+workflow.add_node("ETLAgent", functools.partial(run_etl_agent_node, llm)) 
 
-workflow.set_entry_point("supervisor")
+
+workflow.set_entry_point("Orchestrator")
 
 workflow.add_conditional_edges(
-    "supervisor",
+    "Orchestrator",
     lambda x: x["next"],
     {
         "SchemaModeler": "SchemaModeler",
@@ -150,12 +69,8 @@ workflow.add_conditional_edges(
 workflow.add_edge("SchemaModeler", END)
 workflow.add_edge("ETLAgent", END)
 
-# ======================= KORRIGIERTER TEIL =======================
-# Importiere den asynchronen Saver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-# Diese Funktion wird die App bei der ersten Anfrage asynchron kompilieren.
-# Sie stellt sicher, dass der Checkpointer im richtigen Kontext erstellt wird.
+
 async def get_app():
     async with _app_lock:
         if _app_container["app"] is None:
@@ -178,9 +93,6 @@ async def on_shutdown():
         print("--- Closing Checkpointer Connection ---")
         await manager.__aexit__(None, None, None)
 
-# --- 5. Gradio-Interface (leicht angepasst) ---
-
-# --- 5. Gradio-Interface (mit Streaming-Logik angepasst) ---
 
 def list_kb_files():
     """Listet unterstützte Dateien aus dem Knowledge-Base-Verzeichnis auf."""
@@ -222,17 +134,16 @@ async def respond(message: str, chat_history: list, selected_files: list, upload
 
         if kind == "on_chain_start":
             if name in ["supervisor", "SchemaModeler", "DataExtractor"]:
-                 yield f"**```\n🕵️ Agent '{name}' started...\n```**\n"
+                 yield f"```\n🕵️ Agent '{name}' started...\n```\n"
 
         elif kind == "on_chat_model_stream":
             content = event["data"]["chunk"].content
             if content:
-                # Streame das Token direkt an die UI
                 yield content
         
         elif kind == "on_tool_start":
             tool_input = event['data'].get('input', '')
-            yield f"\n\n**```\n⚙️ Calling Tool `{event['name']}`...**\n"
+            yield f"\n\n```\n⚙️ Calling Tool `{event['name']}`...\n"
             if isinstance(tool_input, str) and tool_input:
                  yield f"```python\n{tool_input.strip()}\n```\n"
 
@@ -294,6 +205,5 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             ],
             inputs=msg_box
         )
-
 
 demo.launch()

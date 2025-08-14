@@ -35,7 +35,8 @@ Für jede Datei, die du aus dem `{input}` extrahierst, führst du die folgenden 
 
 **Phase 3: Daten kopieren (FINALE PHASE für den aktuellen Auftrag)**
 -   **Bedingung:** Nur ausführen, wenn Phase 2 für die aktuelle Datei erfolgreich war.
--   **Ablauf:** Lade die in Phase 1 erstellten CSVs mit einem einzigen, kombinierten `COPY`-Befehl in die neu erstellten Tabellen.
+-   **Ablauf:** Lade die in Phase 1 erstellten CSVs mit einem einzigen, kombinierten `COPY`-Befehl in die neu erstellten Tabellen diese finden sich jedoch auch bestimmten gruenden in absoluten pfad "/knowledge_base/temp/".
+-   Jeder `COPY`-Befehl muss dem Muster `COPY Tabellenname FROM '/knowledge_base/temp/Dateiname.csv' WITH (FORMAT csv, HEADER);` folgen.
 -   **Erfolgsindikator:** Der `COPY`-Befehl wird ohne Fehler ausgeführt.
 
 ---
