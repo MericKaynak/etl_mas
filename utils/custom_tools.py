@@ -13,15 +13,13 @@ class QuietPythonREPLTool(PythonREPLTool):
             return result[:2000] + "\n... (output was cut, it is too long)"
         return result
 
-class PostgreSQLToolkit():
-    @staticmethod 
-    def get_tools(llm):
-        pg_user = os.getenv("POSTGRES_USER")
-        pg_pass = os.getenv("POSTGRES_PASSWORD")
-        pg_db = os.getenv("POSTGRES_DB")
-        pg_host = os.getenv("POSTGRES_HOST")
-        pg_port = os.getenv("POSTGRES_PORT")
-        db_uri = f"postgresql+psycopg2://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
-        db = SQLDatabase.from_uri(db_uri)
-        sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
-        return sql_toolkit.get_tools() 
+def get_postgres_toolkit(llm):
+    pg_user = os.getenv("POSTGRES_USER")
+    pg_pass = os.getenv("POSTGRES_PASSWORD")
+    pg_db = os.getenv("POSTGRES_DB")
+    pg_host = os.getenv("POSTGRES_HOST")
+    pg_port = os.getenv("POSTGRES_PORT")
+    db_uri = f"postgresql+psycopg2://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
+    db = SQLDatabase.from_uri(db_uri)
+    sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+    return sql_toolkit.get_tools() 

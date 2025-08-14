@@ -1,5 +1,5 @@
 from langchain.agents import create_react_agent, AgentExecutor
-from utils.custom_tools import QuietPythonREPLTool,PostgreSQLToolkit
+from utils.custom_tools import QuietPythonREPLTool,get_postgres_toolkit
 from langchain.prompts import PromptTemplate
 from utils.agent_state import AgentState
 from utils.helper_utils import generate_file_analysis_context
@@ -11,7 +11,7 @@ KB_DIR = Path("knowledge_base/persistant")
 
 def create_etl_agent_executor(llm):
     python_tool = QuietPythonREPLTool(description="Dient dazu Daten zu laden, transformieren und zu speichern.")
-    sql_tools = PostgreSQLToolkit.get_tools(llm)
+    sql_tools = get_postgres_toolkit(llm)
     tools = [python_tool] + sql_tools
 
     with open("prompts\etl_agent\system_prompt.txt", "r", encoding="utf-8") as f:
@@ -31,8 +31,7 @@ def create_etl_agent_executor(llm):
     return agent_executor
 
 async def run_etl_agent_node(llm, state: AgentState):
-    print("--- AGENT: ETLAgent ---")
-    user_message = state['messages'][-1].content
+    print("--- AGENT: ETL Agent ---")
     linkml_schema = state.get("linkml_schema", "No LinkML schema provided.")
 
     agent_executor = create_etl_agent_executor(llm)
@@ -48,11 +47,3 @@ async def run_etl_agent_node(llm, state: AgentState):
     
     return {"messages": [AIMessage(content=result["output"])]}
 
-
-# KNOTEN 3: Supervisor (Der Router)
-from langchain_core.pydantic_v1 import BaseModel, Field
-class RouteQuery(BaseModel):
-    next_agent: str = Field(
-        description="Must be 'SchemaModeler' or 'ETLAgent'.", 
-        enum=["SchemaModeler", "ETLAgent"]
-    )

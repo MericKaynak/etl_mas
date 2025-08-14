@@ -30,14 +30,8 @@ llm = init_chat_model(
 KB_DIR = Path("knowledge_base/persistant")
 KB_DIR.mkdir(exist_ok=True)
 
-EXTRACTOR_PROMPT_DIR = Path("prompts/data_extractor")
-TEMP_UPLOADS_DIR = Path("temp_uploads")
-
-
-EXTRACTOR_PROMPT_DIR.mkdir(exist_ok=True, parents=True)
+TEMP_UPLOADS_DIR = Path("knowledge_base/uploads")
 TEMP_UPLOADS_DIR.mkdir(exist_ok=True)
-
-from langchain.prompts import PromptTemplate
 
 with open("prompts\etl_agent\system_prompt.txt", "r", encoding="utf-8") as f:
     ETL_AGENT_SYSTEM_PROMPT = f.read()
