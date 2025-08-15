@@ -15,6 +15,6 @@ RUN pip install --upgrade pip setuptools wheel build
 
 RUN uv venv
 
-RUN uv pip install .
+RUN uv sync
 
 CMD ["uv", "run", "main.py"]

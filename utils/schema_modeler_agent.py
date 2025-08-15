@@ -29,3 +29,4 @@ async def run_schema_modeler_node(llm, state: AgentState):
     chain = prompt | llm
     response = await chain.ainvoke({"chat_history": state['messages'][:-1], "input": user_message, "data_context": full_data_context})
     return {"messages": [response]}
+    

@@ -15,7 +15,9 @@ from utils.schema_modeler_agent import run_schema_modeler_node
 from utils.agent_state import AgentState
 from utils.etl_agent import run_etl_agent_node
 from utils.orchestrator import orchestrator_node
+from utils.data_analyst import run_data_analyst_node
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
 
 load_dotenv()
 api_key = os.getenv("LLM_API_KEY")
@@ -36,8 +38,6 @@ TEMP_UPLOADS_DIR.mkdir(exist_ok=True)
 with open("prompts\etl_agent\system_prompt.txt", "r", encoding="utf-8") as f:
     ETL_AGENT_SYSTEM_PROMPT = f.read()
 
-
-
 _app_container = {"app": None}
 _app_lock = asyncio.Lock()
 
@@ -47,6 +47,9 @@ workflow = StateGraph(AgentState)
 workflow.add_node("Orchestrator", functools.partial(orchestrator_node, llm))
 workflow.add_node("SchemaModeler", functools.partial(run_schema_modeler_node, llm))
 workflow.add_node("ETLAgent", functools.partial(run_etl_agent_node, llm)) 
+workflow.add_node("DataAnalyst", functools.partial(run_data_analyst_node, llm))
+workflow.add_node("Fallback", functools.partial(run_data_analyst_node, llm))
+
 
 
 workflow.set_entry_point("Orchestrator")
@@ -56,13 +59,15 @@ workflow.add_conditional_edges(
     lambda x: x["next"],
     {
         "SchemaModeler": "SchemaModeler",
-        "ETLAgent": "ETLAgent"
+        "ETLAgent": "ETLAgent",
+        "DataAnalyst": "DataAnalyst",
+        "Fallback": "Fallback"
     }
 )
 
 workflow.add_edge("SchemaModeler", END)
 workflow.add_edge("ETLAgent", END)
-
+workflow.add_edge("DataAnalyst",END)
 
 
 async def get_app():
@@ -127,7 +132,7 @@ async def respond(message: str, chat_history: list, selected_files: list, upload
         name = event.get("name", "")
 
         if kind == "on_chain_start":
-            if name in ["supervisor", "SchemaModeler", "DataExtractor"]:
+            if name in ["Orchestrator", "SchemaModeler", "DataExtractor", "DataAnalyst"]:
                  yield f"```\n🕵️ Agent '{name}' started...\n```\n"
 
         elif kind == "on_chat_model_stream":
@@ -195,7 +200,8 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Examples(
             examples=[
                 ["Can you generate a LinkML schema that reflects the data structure, its format, and relationships?"],
-                ["Extract, transform and load the Data into the database base of the info provided by the linkml schema"]
+                ["Extract, transform and load the Data into the database base of the info provided by the linkml schema?"],
+                ["Look up in the Database. Create me a view with de best selling artist in descending ordner and save it as a csv file in  the dir '/knowledge_base/persistant/'."]
             ],
             inputs=msg_box
         )

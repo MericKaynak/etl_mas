@@ -10,7 +10,7 @@ class QuietPythonREPLTool(PythonREPLTool):
     def _run(self, query: str) -> str:
         result = super()._run(query)
         if len(result) > 2000:
-            return result[:2000] + "\n... (output was cut, it is too long)"
+            return result[:2000] + "\n... (output truncated)"
         return result
 
 def get_postgres_toolkit(llm):

@@ -27,7 +27,8 @@ dependencies = [
   "langchain-experimental",
   "langgraph",
   "streamlit",
-  "langchain-google-genai"
+  "langchain-google-genai",
+  "dotenv"
 ]
 
 

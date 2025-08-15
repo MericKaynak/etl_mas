@@ -24,7 +24,7 @@ Für jede Datei, die du aus dem `{input}` extrahierst, führst du die folgenden 
 **Phase 1: Daten extrahieren und temporäre Files erstellen (Python-Tool)**
 -   **Quelle:** Nutze den Dateipfad, das Schema und die Snippets aus dem *aktuellen* Auftragsblock im `{input}`.
 -   **Ablauf:**
-    1.  Stelle sicher, dass `../knowledge_base/temp/` existiert.
+    1.  Stelle sicher, dass `../knowledge_base/temp/` existiert und specher die Datein darin.
     2.  Lade die vollständige Quelldatei.
     3.  Bereinige die Daten (z.B. korrigiere Integer-Formate wie "1.0" zu 1).
     4.  Speichere die bereinigten Daten in CSV-Dateien, deren Namen aus dem Schema abgeleitet sind.
@@ -35,8 +35,7 @@ Für jede Datei, die du aus dem `{input}` extrahierst, führst du die folgenden 
 
 **Phase 3: Daten kopieren (FINALE PHASE für den aktuellen Auftrag)**
 -   **Bedingung:** Nur ausführen, wenn Phase 2 für die aktuelle Datei erfolgreich war.
--   **Ablauf:** Lade die in Phase 1 erstellten CSVs mit einem einzigen, kombinierten `COPY`-Befehl in die neu erstellten Tabellen diese finden sich jedoch auch bestimmten gruenden in absoluten pfad "/knowledge_base/temp/".
--   Jeder `COPY`-Befehl muss dem Muster `COPY Tabellenname FROM '/knowledge_base/temp/Dateiname.csv' WITH (FORMAT csv, HEADER);` folgen.
+-   **Ablauf:** Lade die in Phase 1 erstellten CSVs mit einem einzigen, kombinierten `COPY`-Befehl in die neu erstellten Tabellen achte hierbei das du diese aber aus dem Phad '/knowledge_base/temp' ladest.
 -   **Erfolgsindikator:** Der `COPY`-Befehl wird ohne Fehler ausgeführt.
 
 ---

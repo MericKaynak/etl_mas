@@ -12,7 +12,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init_db:/docker-entrypoint-initdb.d
-      - ./knowledge_base/temp:/knowledge_base/temp
+      - ./knowledge_base/:/knowledge_base/
 
   pgadmin:
     image: dpage/pgadmin4
