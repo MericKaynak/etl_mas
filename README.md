@@ -18,4 +18,4 @@ The core of this project is a sophisticated multi-agent system that leverages La
 
 The architecture of the multi-agent system is designed to be modular and scalable. The following diagram illustrates the main components and their interactions:
 
-![MAS](bild.svg)
+![MAS](src/mas.drawio.svg)
